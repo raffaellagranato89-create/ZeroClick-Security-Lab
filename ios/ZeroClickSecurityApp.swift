@@ -411,7 +411,7 @@ private struct ExternalLinkResult: Decodable {
 }
 
 struct LinkScannerView: View {
-    @AppStorage("sentinel.linkCheckEndpoint") private var endpoint = ""
+    @AppStorage("sentinel.linkCheckEndpoint") private var endpoint = "https://zeroclick-security-lab.raffaellagranato89.workers.dev"
     @State private var linkText = ""
     @State private var isChecking = false
     @State private var result: ExternalLinkResult?
