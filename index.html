@@ -413,28 +413,7 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
 $("exportPdf").onclick=()=>{
 const w=window.open("","_blank");if(!w){alert("Consenti i popup in Safari.");return;}
 const entries=log.map(x=>"<article><b>"+esc(x.category)+" — "+esc(x.status)+"</b><p>"+esc(new Date(x.date).toLocaleString("it-IT"))+"</p><p>"+esc(x.detail)+"</p></article>").join("");
-w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>SENTINEL Report</title><style>body{font:14px Arial;padding:25px;color:#17243a}article{border-bottom:1px solid #ddd;padding:10px 0}p{overflow-wrap:anywhere}</style></head><body><h1>SENTINEL SECURITY</h1><p>Rapporto diagnostico locale; non certifica l'assenza di malware.</p>"+(entries||"Nessuna attività registrata")+"<script type="module">
-import { analyzeTextArtifact, DEFAULT_IOC_PACK } from "./anti-spyware/ios-ioc-engine.js";
-const byId=id=>document.getElementById(id);
-byId("runForensicAnalysis")?.addEventListener("click",async()=>{
- const out=byId("forensicResult"),button=byId("runForensicAnalysis");
- const artifact=byId("forensicArtifact")?.files?.[0],packFile=byId("iocPack")?.files?.[0];
- if(!artifact){out.textContent="Seleziona prima un rapporto diagnostico.";return;}
- if(!byId("forensicConsent")?.checked){out.textContent="Conferma il consenso all'analisi locale.";return;}
- if(artifact.size>20*1024*1024){out.textContent="File troppo grande: limite 20 MB.";return;}
- button.disabled=true;out.textContent="Analisi locale in corso…";
- try{
-   let pack=DEFAULT_IOC_PACK;
-   if(packFile){if(packFile.size>2*1024*1024)throw new Error("Pacchetto IOC troppo grande (massimo 2 MB).");pack=JSON.parse(await packFile.text());}
-   const result=analyzeTextArtifact(await artifact.text(),pack);
-   const statusLabel=result.status==="indicator_match"?"CORRISPONDENZA IOC — DA VERIFICARE":result.status==="not_tested"?"CONTROLLO NON ESEGUITO — PACCHETTO IOC VUOTO":"NESSUNA CORRISPONDENZA NEL PACCHETTO";
-   const lines=["File analizzato: "+artifact.name,"Pacchetto IOC: "+(pack.packId||"personalizzato")+" · Fonte: "+(pack.source||"non specificata"),"Indicatori caricati: "+result.indicatorCount,"Esito: "+statusLabel,"Corrispondenze: "+result.matches.length,...result.matches.map(x=>"- "+x.type+": "+x.value+" · Fonte: "+x.source),...result.limitations.map(x=>"- "+x)];
-   out.replaceChildren();const pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";pre.style.overflowWrap="anywhere";pre.textContent=lines.join("\n");out.append(pre);
-   window.dispatchEvent(new CustomEvent("sentinel-forensic-result",{detail:{status:result.status,matches:result.matches.length,fileName:artifact.name}}));
- }catch(e){out.textContent="Analisi non riuscita: "+e.message;}
- finally{button.disabled=false;}
-});
-</script>
+w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>SENTINEL Report</title><style>body{font:14px Arial;padding:25px;color:#17243a}article{border-bottom:1px solid #ddd;padding:10px 0}p{overflow-wrap:anywhere}</style></head><body><h1>SENTINEL SECURITY</h1><p>Rapporto diagnostico locale; non certifica l'assenza di malware.</p>"+(entries||"Nessuna attività registrata")+"</body></html>");
 </body></html>");
 w.document.close();w.focus();setTimeout(()=>w.print(),500);
 };
@@ -540,6 +519,29 @@ metrics();
 render();
 if(prefs.app)checkUpdates();
 })();
+</script>
+
+<script type="module">
+import { analyzeTextArtifact, DEFAULT_IOC_PACK } from "./anti-spyware/ios-ioc-engine.js";
+const byId=id=>document.getElementById(id);
+byId("runForensicAnalysis")?.addEventListener("click",async()=>{
+ const out=byId("forensicResult"),button=byId("runForensicAnalysis");
+ const artifact=byId("forensicArtifact")?.files?.[0],packFile=byId("iocPack")?.files?.[0];
+ if(!artifact){out.textContent="Seleziona prima un rapporto diagnostico.";return;}
+ if(!byId("forensicConsent")?.checked){out.textContent="Conferma il consenso all'analisi locale.";return;}
+ if(artifact.size>20*1024*1024){out.textContent="File troppo grande: limite 20 MB.";return;}
+ button.disabled=true;out.textContent="Analisi locale in corso…";
+ try{
+   let pack=DEFAULT_IOC_PACK;
+   if(packFile){if(packFile.size>2*1024*1024)throw new Error("Pacchetto IOC troppo grande (massimo 2 MB).");pack=JSON.parse(await packFile.text());}
+   const result=analyzeTextArtifact(await artifact.text(),pack);
+   const statusLabel=result.status==="indicator_match"?"CORRISPONDENZA IOC — DA VERIFICARE":result.status==="not_tested"?"CONTROLLO NON ESEGUITO — PACCHETTO IOC VUOTO":"NESSUNA CORRISPONDENZA NEL PACCHETTO";
+   const lines=["File analizzato: "+artifact.name,"Pacchetto IOC: "+(pack.packId||"personalizzato")+" · Fonte: "+(pack.source||"non specificata"),"Indicatori caricati: "+result.indicatorCount,"Esito: "+statusLabel,"Corrispondenze: "+result.matches.length,...result.matches.map(x=>"- "+x.type+": "+x.value+" · Fonte: "+x.source),...result.limitations.map(x=>"- "+x)];
+   out.replaceChildren();const pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";pre.style.overflowWrap="anywhere";pre.textContent=lines.join("\n");out.append(pre);
+   window.dispatchEvent(new CustomEvent("sentinel-forensic-result",{detail:{status:result.status,matches:result.matches.length,fileName:artifact.name}}));
+ }catch(e){out.textContent="Analisi non riuscita: "+e.message;}
+ finally{button.disabled=false;}
+});
 </script>
 </body>
 </html>
