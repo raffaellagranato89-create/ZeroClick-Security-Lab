@@ -11,7 +11,7 @@ function json(data, status = 200) {
 }
 
 async function googleCheck(url, key) {
-  if (!key) return { status: "not_configured", message: "Google Safe Browsing API key non configurata." };
+  if (!key) return { status: "not_configured", message: "Google Safe Browsing non configurato." };
   try {
     const response = await fetch("https://safebrowsing.googleapis.com/v4/threatMatches:find?key=" + encodeURIComponent(key), {
       method: "POST",
@@ -26,71 +26,32 @@ async function googleCheck(url, key) {
         }
       })
     });
-    if (!response.ok) return { status: "error", message: "Google Safe Browsing ha restituito HTTP " + response.status + "." };
+    if (!response.ok) return { status: "error", message: "Google Safe Browsing HTTP " + response.status + "." };
     const data = await response.json();
     const matches = data.matches || [];
-    return {
-      status: "checked",
-      malicious: matches.length,
-      message: matches.length ? "URL presente nelle segnalazioni: " + matches.map(x => x.threatType).join(", ") : "Nessuna corrispondenza trovata."
-    };
+    return { status: "checked", malicious: matches.length, message: matches.length ? "URL segnalato da Google Safe Browsing." : "Nessuna corrispondenza trovata." };
   } catch {
-    return { status: "error", message: "Errore durante il collegamento a Google Safe Browsing." };
+    return { status: "error", message: "Errore di collegamento a Google Safe Browsing." };
   }
 }
 
-async function virusTotalCheck(url, key) {
-  if (!key) return { status: "not_configured", message: "VirusTotal API key non configurata." };
+async function destroyListCheck(domain) {
   try {
-    const form = new URLSearchParams();
-    form.set("url", url);
-    const submitted = await fetch("https://www.virustotal.com/api/v3/urls", {
-      method: "POST",
-      headers: { "x-apikey": key, "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString()
-    });
-
-    let analysisId;
-    if (submitted.ok) {
-      const body = await submitted.json();
-      analysisId = body.data && body.data.id;
-    } else if (submitted.status === 409) {
-      const encoded = btoa(url).replace(/=/g, "");
-      const lookup = await fetch("https://www.virustotal.com/api/v3/urls/" + encoded, {
-        headers: { "x-apikey": key }
-      });
-      if (!lookup.ok) return { status: "error", message: "VirusTotal non ha potuto recuperare l'analisi esistente." };
-      const body = await lookup.json();
-      const stats = body.data && body.data.attributes && body.data.attributes.last_analysis_stats;
-      if (!stats) return { status: "pending", message: "Analisi VirusTotal non ancora disponibile." };
-      return {
-        status: "checked",
-        malicious: stats.malicious || 0,
-        suspicious: stats.suspicious || 0,
-        undetected: stats.undetected || 0,
-        message: "Statistiche dell'ultima analisi disponibile."
-      };
-    } else {
-      return { status: "error", message: "VirusTotal ha restituito HTTP " + submitted.status + "." };
-    }
-
-    if (!analysisId) return { status: "pending", message: "VirusTotal ha ricevuto il link; analisi in attesa." };
-    const analysis = await fetch("https://www.virustotal.com/api/v3/analyses/" + encodeURIComponent(analysisId), {
-      headers: { "x-apikey": key }
-    });
-    if (!analysis.ok) return { status: "pending", message: "Analisi inviata a VirusTotal, risultati non ancora pronti." };
-    const body = await analysis.json();
-    const stats = body.data && body.data.attributes && body.data.attributes.stats;
-    if (!stats) return { status: "pending", message: "Analisi VirusTotal in elaborazione." };
+    const endpoint = "https://api.destroy.tools/v1/check?domain=" + encodeURIComponent(domain);
+    const response = await fetch(endpoint, { headers: { "Accept": "application/json" } });
+    if (!response.ok) return { status: "error", message: "PhishDestroy HTTP " + response.status + "." };
+    const data = await response.json();
+    const score = Number(data.risk_score ?? data.score ?? 0);
+    const threat = data.threat === true || data.malicious === true || score >= 20;
     return {
       status: "checked",
-      malicious: stats.malicious || 0,
-      suspicious: stats.suspicious || 0,
-      undetected: stats.undetected || 0,
-      message: "Risultati dell'analisi appena richiesta."
+      malicious: threat ? 1 : 0,
+      riskScore: Number.isFinite(score) ? score : null,
+      severity: data.severity || "unknown",
+      message: threat ? "Il dominio risulta segnalato dal database PhishDestroy." : "Nessuna segnalazione restituita dal database PhishDestroy."
     };
   } catch {
-    return { status: "error", message: "Errore durante il collegamento a VirusTotal." };
+    return { status: "error", message: "Errore di collegamento a PhishDestroy." };
   }
 }
 
@@ -111,23 +72,17 @@ export default {
       return json({ error: "Sono ammessi solo URL HTTP/HTTPS senza credenziali incorporate." }, 400);
     }
 
-    const [googleSafeBrowsing, virusTotal] = await Promise.all([
-      googleCheck(parsed.href, env.GOOGLE_SAFE_BROWSING_API_KEY),
-      virusTotalCheck(parsed.href, env.VIRUSTOTAL_API_KEY)
+    const [phishDestroy, googleSafeBrowsing] = await Promise.all([
+      destroyListCheck(parsed.hostname.toLowerCase()),
+      googleCheck(parsed.href, env.GOOGLE_SAFE_BROWSING_API_KEY)
     ]);
 
-    const detected = (googleSafeBrowsing.malicious || 0) > 0 ||
-      (virusTotal.malicious || 0) > 0 || (virusTotal.suspicious || 0) > 0;
-    const configured = [googleSafeBrowsing, virusTotal].filter(x => x.status === "checked").length;
+    const detected = (phishDestroy.malicious || 0) > 0 || (googleSafeBrowsing.malicious || 0) > 0;
+    const configured = [phishDestroy, googleSafeBrowsing].filter(x => x.status === "checked").length;
     const verdict = detected ? "POSSIBILE MINACCIA RILEVATA" :
       configured === 0 ? "VERIFICA NON DISPONIBILE" :
       "NESSUNA MINACCIA RILEVATA DAI SERVIZI INTERROGATI";
 
-    return json({
-      verdict,
-      googleSafeBrowsing,
-      virusTotal,
-      checkedAt: new Date().toISOString()
-    });
+    return json({ verdict, phishDestroy, googleSafeBrowsing, checkedAt: new Date().toISOString() });
   }
 };
