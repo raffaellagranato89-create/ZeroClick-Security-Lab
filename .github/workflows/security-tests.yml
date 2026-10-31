@@ -1,0 +1,41 @@
+name: SENTINEL Security Regression Tests
+
+on:
+  push:
+    paths:
+      - "anti-spyware/**"
+      - "security-tests.js"
+      - ".github/workflows/security-tests.yml"
+  pull_request:
+    paths:
+      - "anti-spyware/**"
+      - "security-tests.js"
+      - ".github/workflows/security-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run IOC engine regression tests
+        run: |
+          node --input-type=module <<'NODE'
+          import { runSecurityTests } from "./security-tests.js";
+          const results = runSecurityTests();
+          for (const result of results) {
+            console.log(`${result.passed ? "PASS" : "FAIL"}: ${result.name}`);
+            if (result.error) console.error(result.error);
+          }
+          const failed = results.filter(result => !result.passed);
+          console.log(`\n${results.length - failed.length}/${results.length} tests passed`);
+          if (failed.length) process.exit(1);
+          NODE
