@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "SENTINEL SECURITY",
+  "short_name": "SENTINEL",
+  "description": "Personal cybersecurity platform",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080f1e",
+  "theme_color": "#080f1e",
+  "icons": [
+    {
+      "src": "./sentinel-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
