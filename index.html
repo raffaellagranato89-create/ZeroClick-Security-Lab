@@ -427,7 +427,8 @@ byId("runForensicAnalysis")?.addEventListener("click",async()=>{
    let pack=DEFAULT_IOC_PACK;
    if(packFile){if(packFile.size>2*1024*1024)throw new Error("Pacchetto IOC troppo grande (massimo 2 MB).");pack=JSON.parse(await packFile.text());}
    const result=analyzeTextArtifact(await artifact.text(),pack);
-   const lines=["File analizzato: "+artifact.name,"Pacchetto IOC: "+(pack.packId||"personalizzato")+" · Fonte: "+(pack.source||"non specificata"),"Esito: "+(result.status==="indicator_match"?"CORRISPONDENZA IOC":"NESSUNA CORRISPONDENZA NEL PACCHETTO"),"Corrispondenze: "+result.matches.length,...result.matches.map(x=>"- "+x.type+": "+x.value+" · Fonte: "+x.source),...result.limitations.map(x=>"- "+x)];
+   const statusLabel=result.status==="indicator_match"?"CORRISPONDENZA IOC — DA VERIFICARE":result.status==="not_tested"?"CONTROLLO NON ESEGUITO — PACCHETTO IOC VUOTO":"NESSUNA CORRISPONDENZA NEL PACCHETTO";
+   const lines=["File analizzato: "+artifact.name,"Pacchetto IOC: "+(pack.packId||"personalizzato")+" · Fonte: "+(pack.source||"non specificata"),"Indicatori caricati: "+result.indicatorCount,"Esito: "+statusLabel,"Corrispondenze: "+result.matches.length,...result.matches.map(x=>"- "+x.type+": "+x.value+" · Fonte: "+x.source),...result.limitations.map(x=>"- "+x)];
    out.replaceChildren();const pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";pre.style.overflowWrap="anywhere";pre.textContent=lines.join("\n");out.append(pre);
    window.dispatchEvent(new CustomEvent("sentinel-forensic-result",{detail:{status:result.status,matches:result.matches.length,fileName:artifact.name}}));
  }catch(e){out.textContent="Analisi non riuscita: "+e.message;}
