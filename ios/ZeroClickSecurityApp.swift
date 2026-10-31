@@ -401,7 +401,7 @@ private struct ExternalLinkResult: Decodable {
         let status: String
         let message: String?
         let malicious: Int?
-        let suspicious: Int?
+        let suspicious: Bool?
         let undetected: Int?
     }
     let verdict: String
@@ -465,7 +465,7 @@ struct LinkScannerView: View {
                     .font(.footnote)
             }
             if let suspicious = source.suspicious {
-                Text("Rilevamenti sospetti: \\(suspicious)")
+                Text(suspicious ? "Segnali sospetti: presenti" : "Segnali sospetti: non rilevati")
                     .font(.footnote)
             }
             if let undetected = source.undetected {
