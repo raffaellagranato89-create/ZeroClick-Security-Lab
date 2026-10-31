@@ -1,4 +1,4 @@
-const CACHE_NAME = "sentinel-shell-v10";
+const CACHE_NAME = "sentinel-shell-v11";
 const APP_FILES = ["./", "./index.html", "./manifest.webmanifest", "./sentinel-icon.svg", "./dashboard.js", "./manual-log.js", "./risk-analyzer.js", "./security.js", "./simulation.js", "./security-tests.js", "./version.json", "./anti-spyware/ios-ioc-engine.js"];
 
 self.addEventListener("install", event => {
@@ -13,6 +13,11 @@ self.addEventListener("fetch", event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  // Il file versione deve essere sempre letto dalla rete, mai dalla cache offline.
+  if (url.pathname.endsWith("/version.json")) {
+    event.respondWith(fetch(request, { cache: "no-store" }));
+    return;
+  }
   if (url.pathname.includes("/workers.dev") || url.pathname.includes("/api/")) return;
 
   if (request.mode === "navigate") {
