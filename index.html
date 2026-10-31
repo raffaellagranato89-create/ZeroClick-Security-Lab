@@ -121,7 +121,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 "use strict";
 const $=id=>document.getElementById(id);
 const LOG_KEY="sentinelSOCLog",PHONE_KEY="sentinelPrivatePhone",PREF_KEY="sentinelNotificationPrefs";
-const APP_VERSION="1.5.0";
+const APP_VERSION="1.6.0";
 const VERSION_URL="./version.json";
 const APP_URL="https://raffaellagranato89-create.github.io/ZeroClick-Security-Lab/";
 let log=[],lastHash="",availableVersion="";
@@ -288,16 +288,36 @@ if(/(^|[-.])(login|verify|secure|account|update|wallet|bank|support)([-.]|$)/i.t
 if(parsed.protocol!=="https:")findings.push("Connessione senza HTTPS");
 if(parsed.port&&parsed.port!=="80"&&parsed.port!=="443")findings.push("Porta non standard");
 if(host.length>45)findings.push("Nome host insolitamente lungo");
-const risk=remoteThreat?"MINACCIA SEGNALATA":remoteSuspicious||findings.length>=2?"LINK SOSPETTO":findings.length?"ATTENZIONE":"NESSUNA SEGNALAZIONE RILEVATA";
-const explanation=remoteThreat?"Una fonte di reputazione ha segnalato il link. Non aprirlo.":remoteSuspicious?"La fonte di reputazione ha restituito un indicatore sospetto.":findings.length?"L'analisi locale ha trovato caratteristiche da verificare.":"Non sono emersi indicatori nei controlli eseguiti. Non è una garanzia di sicurezza.";
+const weights=[
+["Credenziali incorporate",30],["Indirizzo IP",20],["Dominio internazionalizzato",25],["Caratteri non latini",25],
+["Molti sottodomini",10],["Parole spesso usate",15],["Connessione senza HTTPS",15],["Porta non standard",10],["Nome host insolitamente lungo",5]
+];
+let riskScore=remoteThreat?100:remoteSuspicious?55:findings.reduce((sum,item)=>{
+const match=weights.find(([label])=>item.startsWith(label));
+return sum+(match?match[1]:0);
+},0);
+riskScore=Math.min(100,riskScore);
+const riskLevel=remoteThreat||riskScore>=60?"ALTO":riskScore>=25?"MEDIO":"BASSO";
+const risk=riskLevel==="ALTO"?"RISCHIO ALTO":riskLevel==="MEDIO"?"RISCHIO MEDIO":"RISCHIO BASSO";
+const explanation=remoteThreat?"Una fonte di reputazione ha segnalato il link. Non aprirlo.":remoteSuspicious?"La fonte di reputazione ha restituito un indicatore sospetto: verifica il link prima di procedere.":findings.length?"L'analisi locale ha trovato caratteristiche da verificare.":"Non sono emersi indicatori nei controlli eseguiti. Non è una garanzia di sicurezza.";
 out.replaceChildren();
 const strong=document.createElement("strong");strong.textContent=risk;
+strong.style.color=riskLevel==="ALTO"?"var(--red)":riskLevel==="MEDIO"?"var(--yellow)":"var(--green)";
+const score=document.createElement("p");
+score.textContent="Indice indicativo: "+riskScore+"/100 · Livello "+riskLevel.toLowerCase();
+score.style.fontWeight="700";
+score.style.color=strong.style.color;
+const scale=document.createElement("div");scale.className="progress";
+const fill=document.createElement("div");fill.style.width=riskScore+"%";
+fill.style.background=strong.style.color;scale.append(fill);
+const scaleNote=document.createElement("p");scaleNote.className="note";
+scaleNote.textContent="Il punteggio è una stima euristica interna, non una probabilità di infezione né una certificazione.";
 const p=document.createElement("p");p.textContent=explanation;
 const detail=document.createElement("p");detail.textContent="URL controllato: "+parsed.href;
 const list=document.createElement("ul");list.className="insightList";
 (findings.length?findings:["Nessun indicatore euristico locale rilevato."]).forEach(item=>{const li=document.createElement("li");li.textContent=item;list.append(li);});
 const sources=document.createElement("p");sources.className="note";sources.textContent="Fonti remote: PhishDestroy "+(data.phishDestroy?.status||"non disponibile")+" · Google Safe Browsing "+(data.googleSafeBrowsing?.status||"non configurato");
-out.append(strong,p,detail,list,sources);
+out.append(strong,score,scale,scaleNote,p,detail,list,sources);
 record("Controllo link",remoteThreat||remoteSuspicious||findings.length?"DA VERIFICARE":"CONTROLLO ESEGUITO",parsed.hostname+" · "+risk);
 }catch(e){out.textContent="Controllo non riuscito: "+e.message+" Riprova più tardi.";}
 finally{button.disabled=false;}
