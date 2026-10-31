@@ -121,7 +121,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 "use strict";
 const $=id=>document.getElementById(id);
 const LOG_KEY="sentinelSOCLog",PHONE_KEY="sentinelPrivatePhone",PREF_KEY="sentinelNotificationPrefs";
-const APP_VERSION="1.6.1";
+const APP_VERSION="1.6.2";
 const VERSION_URL="./version.json";
 const APP_URL="https://raffaellagranato89-create.github.io/ZeroClick-Security-Lab/";
 let log=[],lastHash="",availableVersion="";
@@ -144,13 +144,15 @@ const h=document.createElement("div");h.className="resulthead";
 const t=document.createElement("strong");t.textContent=x.category;
 const s=document.createElement("span");s.className="state "+(x.status==="DA VERIFICARE"?"yellow":"green");s.textContent=x.status;
 const p=document.createElement("p");p.textContent=new Date(x.date).toLocaleString("it-IT")+" · "+x.detail;
-h.append(t,s);d.append(h,p);box.append(d);
+h.append(t,s);d.append(h,p);
+if(x.url){const extra=document.createElement("p");extra.textContent="URL: "+x.url+"\nIndice: "+x.score+"/100 · Rischio: "+x.risk;d.append(extra);}
+box.append(d);
 });
 }
 updateAlerts();updateDashboard();
 }
-function record(category,status,detail){
-log.push({date:new Date().toISOString(),category,status,detail});save();render();
+function record(category,status,detail,metadata={}){
+log.push({date:new Date().toISOString(),category,status,detail,...metadata});save();render();
 }
 function openPage(page){
 document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===page));
@@ -325,7 +327,8 @@ const list=document.createElement("ul");list.className="insightList";
 (findings.length?findings:["Nessun indicatore euristico locale rilevato."]).forEach(item=>{const li=document.createElement("li");li.textContent=item;list.append(li);});
 const sources=document.createElement("p");sources.className="note";sources.textContent="Fonti remote: "+(remoteAvailable?("PhishDestroy "+(data.phishDestroy?.status||"non disponibile")+" · Google Safe Browsing "+(data.googleSafeBrowsing?.status||"non configurato")):("non disponibili ("+remoteError+"). Il punteggio mostrato deriva solo dall’analisi locale."));
 out.append(strong,score,scale,scaleNote,p,detail,list,sources);
-record("Controllo link",remoteThreat||remoteSuspicious||findings.length?"DA VERIFICARE":"CONTROLLO ESEGUITO",parsed.hostname+" · "+risk);
+const historyUrl=new URL(parsed.href);historyUrl.username="";historyUrl.password="";historyUrl.search="";historyUrl.hash="";
+record("Controllo link",remoteThreat||remoteSuspicious||findings.length?"DA VERIFICARE":"CONTROLLO ESEGUITO",parsed.hostname+" · "+risk,{url:historyUrl.href,score:riskScore,risk:riskLevel});
 }catch(e){out.textContent="Controllo non riuscito: "+e.message+" Riprova più tardi.";}
 finally{button.disabled=false;}
 });
@@ -395,7 +398,7 @@ const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.downl
 }
 $("exportCsv").onclick=()=>{
 if(!log.length){alert("Nessun dato da esportare.");return;}
-const rows=[["Data","Categoria","Stato","Dettaglio"],...log.map(x=>[x.date,x.category,x.status,x.detail])];
+const rows=[["Data","Categoria","Stato","Dettaglio","URL","Indice","Rischio"],...log.map(x=>[x.date,x.category,x.status,x.detail,x.url||"",x.score??"",x.risk||""])];
 const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
 download(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}),"sentinel-report.csv");
 };
