@@ -1,35 +1,24 @@
 # SENTINEL SECURITY – External link reputation API
 
-This repository includes an optional Cloudflare Worker proxy at `security-api/worker.js`.
-The iOS app sends a URL to this endpoint only after the user taps **Verifica con i database esterni**.
+The Cloudflare Worker at `security-api/worker.js` checks submitted domains with the public PhishDestroy / DestroyList API. It requires no account, API key, or payment details.
 
-## Free-tier setup (personal, non-commercial use)
+## Free setup
 
-To avoid enabling Google Cloud billing, you can use **VirusTotal Public API only** with the Cloudflare Workers Free plan.
-
-1. Create a Cloudflare account and a Worker named `sentinel-link-check`.
-2. Deploy `security-api/worker.js` as the Worker entry point.
-3. In Worker settings, add one **Secret** environment variable:
-   - `VIRUSTOTAL_API_KEY`
-4. Obtain the key from your VirusTotal account's API key page. Do not purchase a plan.
-5. Deploy the Worker and copy its HTTPS address (for example, `https://sentinel-link-check.<account>.workers.dev`).
-6. Paste that address in SENTINEL SECURITY → Link. The Worker accepts POST requests at its root URL.
-
-**Google Safe Browsing is optional.** The Worker supports it if a suitable key is available, but it is not needed for the free-only setup. Do not create a Google Cloud billing account or enter payment details just for this project.
-
-VirusTotal's Public API has strict quotas and is restricted to permitted non-commercial use. Do not use it for a commercial service or distribute it as a public scanning service. Check the current provider terms and quotas before use. The Cloudflare Free plan also has usage limits; exceeding them may require reducing usage or choosing a different setup, not automatically upgrading.
-
-Never put provider API keys in the iOS app, this repository, screenshots, or public configuration. If a key is exposed, revoke and rotate it.
+1. Keep the existing Cloudflare Worker named `sentinel-link-check`.
+2. Deploy the latest repository version of `security-api/worker.js` (Cloudflare Git integration should detect the commit and deploy automatically; otherwise trigger a deployment).
+3. No VirusTotal secret is required.
+4. Google Safe Browsing is optional. If you already have a suitable key, you may add it as the Worker Secret `GOOGLE_SAFE_BROWSING_API_KEY`; do not create a billing account or enter payment details just for this project.
+5. Copy the Worker HTTPS address and paste it in SENTINEL SECURITY → Link.
 
 ## How it works
 
-- VirusTotal receives the submitted URL for analysis and returns available analysis statistics.
+- PhishDestroy checks the submitted hostname against its public threat-intelligence service: `https://api.destroy.tools/v1/check?domain=`.
 - Google Safe Browsing is queried only if `GOOGLE_SAFE_BROWSING_API_KEY` is configured.
-- The Worker returns each provider's status separately. A pending or unavailable result is not a clean result.
+- An unavailable provider is reported as unavailable, not as a clean result.
 - The app does not automatically open the submitted URL.
 
 ## Privacy and limitations
 
-When the user requests a check, the full URL is transmitted to this Worker and then to the configured providers. Query strings can contain session identifiers or personal tokens; do not submit such links. Provider policies may retain submitted URLs and analysis data. Review their terms before enabling the service.
+The hostname is sent to PhishDestroy; the full URL is sent to Google only if its optional key is configured. Do not submit links containing password-reset tokens, session identifiers, or other secrets.
 
-This is reputation checking, not a guarantee. New, private, targeted or unreported phishing pages may not be detected. Results can be delayed, incomplete or produce false positives. The free/public API tiers have strict rate limits and usage restrictions. Do not use this endpoint as a public unrestricted service; configure Cloudflare rate limiting or an authenticated access layer before wider distribution.
+This is a reputation check, not a guarantee of safety. Newly created, private, targeted, or unreported phishing domains may not be detected. A low score or absence from a blocklist is not proof that a site is safe. Public free services may change availability, limits, or terms. The Worker should not be exposed as an unrestricted public scanning service without rate limiting or an authenticated access layer.
