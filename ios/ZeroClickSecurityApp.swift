@@ -406,7 +406,7 @@ private struct ExternalLinkResult: Decodable {
     }
     let verdict: String
     let googleSafeBrowsing: Source
-    let virusTotal: Source
+    let phishDestroy: Source
     let checkedAt: String?
 }
 
@@ -541,7 +541,7 @@ struct LinkScannerView: View {
                             .font(.headline)
                             .foregroundStyle(result.verdict.lowercased().contains("malicious") || result.verdict.lowercased().contains("unsafe") ? .red : .cyan)
                         sourceView("Google Safe Browsing", result.googleSafeBrowsing)
-                        sourceView("VirusTotal", result.virusTotal)
+                        sourceView("PhishDestroy", result.phishDestroy)
                     }
 
                     Text("Privacy e limiti: il link completo viene trasmesso ai fornitori esterni quando premi Verifica. Evita link contenenti token privati o informazioni personali. I risultati possono essere incompleti o avere falsi positivi; nessun esito garantisce sicurezza.")
