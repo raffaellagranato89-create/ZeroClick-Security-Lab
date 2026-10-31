@@ -121,7 +121,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 "use strict";
 const $=id=>document.getElementById(id);
 const LOG_KEY="sentinelSOCLog",PHONE_KEY="sentinelPrivatePhone",PREF_KEY="sentinelNotificationPrefs";
-const APP_VERSION="1.4.0";
+const APP_VERSION="1.5.0";
 const VERSION_URL="./version.json";
 const APP_URL="https://raffaellagranato89-create.github.io/ZeroClick-Security-Lab/";
 let log=[],lastHash="",availableVersion="";
@@ -274,16 +274,31 @@ try{
 const response=await fetch("https://zeroclick-security-lab.raffaellagranato89.workers.dev",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:parsed.href})});
 let data;try{data=await response.json();}catch(e){throw new Error("Risposta del servizio non leggibile.");}
 if(!response.ok)throw new Error("Servizio non disponibile (HTTP "+response.status+").");
-let status="NESSUNA SEGNALAZIONE RILEVATA";
-let explanation="Non risultano indicatori nelle fonti consultate. Non è una garanzia di sicurezza.";
-if(data.threat===true){status="POTENZIALE MINACCIA";explanation="Il servizio ha restituito un indicatore di minaccia. Non visitare il link e verifica la segnalazione.";}
-else if(data.suspicious===true){status="LINK SOSPETTO";explanation="Il servizio ha rilevato elementi sospetti. Evita di aprire il link finché non hai verificato la fonte.";}
+const remoteThreat=data.threat===true||data.phishDestroy?.malicious>0||data.googleSafeBrowsing?.malicious>0;
+const remoteSuspicious=data.suspicious===true||data.phishDestroy?.suspicious===true;
+const host=parsed.hostname.toLowerCase();
+const labels=host.split(".");
+const findings=[];
+if(parsed.username||parsed.password)findings.push("Credenziali incorporate nell'indirizzo");
+if(/^\d{1,3}(\.\d{1,3}){3}$/.test(host))findings.push("Indirizzo IP usato al posto di un dominio");
+if(host.startsWith("xn--")||host.split(".").some(x=>x.startsWith("xn--")))findings.push("Dominio internazionalizzato (possibile omografo)");
+if(/[а-яΑ-Ω]/i.test(host))findings.push("Caratteri non latini nel nome host");
+if(labels.length>=5)findings.push("Molti sottodomini: verifica il dominio registrabile");
+if(/(^|[-.])(login|verify|secure|account|update|wallet|bank|support)([-.]|$)/i.test(host))findings.push("Parole spesso usate in pagine di accesso o phishing");
+if(parsed.protocol!=="https:")findings.push("Connessione senza HTTPS");
+if(parsed.port&&parsed.port!=="80"&&parsed.port!=="443")findings.push("Porta non standard");
+if(host.length>45)findings.push("Nome host insolitamente lungo");
+const risk=remoteThreat?"MINACCIA SEGNALATA":remoteSuspicious||findings.length>=2?"LINK SOSPETTO":findings.length?"ATTENZIONE":"NESSUNA SEGNALAZIONE RILEVATA";
+const explanation=remoteThreat?"Una fonte di reputazione ha segnalato il link. Non aprirlo.":remoteSuspicious?"La fonte di reputazione ha restituito un indicatore sospetto.":findings.length?"L'analisi locale ha trovato caratteristiche da verificare.":"Non sono emersi indicatori nei controlli eseguiti. Non è una garanzia di sicurezza.";
 out.replaceChildren();
-const strong=document.createElement("strong");strong.textContent=status;
+const strong=document.createElement("strong");strong.textContent=risk;
 const p=document.createElement("p");p.textContent=explanation;
 const detail=document.createElement("p");detail.textContent="URL controllato: "+parsed.href;
-out.append(strong,p,detail);
-record("Controllo link",data.threat===true||data.suspicious===true?"DA VERIFICARE":"CONTROLLO ESEGUITO",parsed.hostname+" · "+status);
+const list=document.createElement("ul");list.className="insightList";
+(findings.length?findings:["Nessun indicatore euristico locale rilevato."]).forEach(item=>{const li=document.createElement("li");li.textContent=item;list.append(li);});
+const sources=document.createElement("p");sources.className="note";sources.textContent="Fonti remote: PhishDestroy "+(data.phishDestroy?.status||"non disponibile")+" · Google Safe Browsing "+(data.googleSafeBrowsing?.status||"non configurato");
+out.append(strong,p,detail,list,sources);
+record("Controllo link",remoteThreat||remoteSuspicious||findings.length?"DA VERIFICARE":"CONTROLLO ESEGUITO",parsed.hostname+" · "+risk);
 }catch(e){out.textContent="Controllo non riuscito: "+e.message+" Riprova più tardi.";}
 finally{button.disabled=false;}
 });
