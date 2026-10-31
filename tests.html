@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SENTINEL · Test automatici</title>
+<style>
+body{font:16px system-ui,sans-serif;max-width:760px;margin:32px auto;padding:0 16px;background:#0b1424;color:#edf4ff}
+h1{font-size:24px}p{color:#a9bbd2;line-height:1.5}
+button{padding:12px 18px;border:0;border-radius:8px;background:#287ee8;color:white;font-weight:700}
+li{padding:8px 0;border-bottom:1px solid #263b57}
+.pass{color:#4cdda0}.fail{color:#ff687c}
+#summary{font-weight:700;margin:18px 0}
+a{color:#64c9ff}
+</style>
+</head>
+<body>
+<h1>SENTINEL — Test automatici reali</h1>
+<p>Questa pagina verifica il comportamento del motore IOC con indicatori sintetici creati esclusivamente per i test. Non esegue una scansione dell'iPhone e non verifica l'assenza di spyware.</p>
+<button id="run">ESEGUI I TEST</button>
+<div id="summary" aria-live="polite">Test non ancora eseguiti.</div>
+<ol id="results"></ol>
+<p><a href="./">Torna a SENTINEL</a></p>
+<script type="module">
+import { runSecurityTests } from "./security-tests.js";
+document.getElementById("run").addEventListener("click",()=>{
+ const results=runSecurityTests(),list=document.getElementById("results");
+ list.replaceChildren();
+ for(const result of results){
+  const item=document.createElement("li");
+  item.className=result.passed?"pass":"fail";
+  item.textContent=(result.passed?"SUPERATO — ":"FALLITO — ")+result.name+(result.error?" · "+result.error:"");
+  list.append(item);
+ }
+ const passed=results.filter(x=>x.passed).length;
+ document.getElementById("summary").textContent=passed+" / "+results.length+" test superati.";
+});
+</script>
+</body>
+</html>
