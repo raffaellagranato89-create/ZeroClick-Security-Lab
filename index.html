@@ -271,9 +271,16 @@ if(!$("linkConsent").checked){out.textContent="Presta il consenso prima del cont
 if(!confirm("L'indirizzo "+parsed.href+" verrà inviato al servizio SENTINEL. Continuare?"))return;
 $("linkConsent").checked=false;button.disabled=true;out.textContent="Controllo in corso…";
 try{
-const response=await fetch("https://zeroclick-security-lab.raffaellagranato89.workers.dev",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:parsed.href})});
-let data;try{data=await response.json();}catch(e){throw new Error("Risposta del servizio non leggibile.");}
-if(!response.ok)throw new Error("Servizio non disponibile (HTTP "+response.status+").");
+let data={phishDestroy:{status:"non disponibile"},googleSafeBrowsing:{status:"non configurato"}};
+let remoteAvailable=false,remoteError="";
+try{
+const remoteUrl=new URL(parsed.href);
+remoteUrl.username="";remoteUrl.password="";
+const response=await fetch("https://zeroclick-security-lab.raffaellagranato89.workers.dev",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:remoteUrl.href})});
+const payload=await response.json();
+if(!response.ok)throw new Error("HTTP "+response.status);
+data=payload;remoteAvailable=true;
+}catch(e){remoteError=e.message||"servizio non raggiungibile";}
 const remoteThreat=data.threat===true||data.phishDestroy?.malicious>0||data.googleSafeBrowsing?.malicious>0;
 const remoteSuspicious=data.suspicious===true||data.phishDestroy?.suspicious===true;
 const host=parsed.hostname.toLowerCase();
@@ -316,7 +323,7 @@ const p=document.createElement("p");p.textContent=explanation;
 const detail=document.createElement("p");detail.textContent="URL controllato: "+parsed.href;
 const list=document.createElement("ul");list.className="insightList";
 (findings.length?findings:["Nessun indicatore euristico locale rilevato."]).forEach(item=>{const li=document.createElement("li");li.textContent=item;list.append(li);});
-const sources=document.createElement("p");sources.className="note";sources.textContent="Fonti remote: PhishDestroy "+(data.phishDestroy?.status||"non disponibile")+" · Google Safe Browsing "+(data.googleSafeBrowsing?.status||"non configurato");
+const sources=document.createElement("p");sources.className="note";sources.textContent="Fonti remote: "+(remoteAvailable?("PhishDestroy "+(data.phishDestroy?.status||"non disponibile")+" · Google Safe Browsing "+(data.googleSafeBrowsing?.status||"non configurato")):("non disponibili ("+remoteError+"). Il punteggio mostrato deriva solo dall’analisi locale."));
 out.append(strong,score,scale,scaleNote,p,detail,list,sources);
 record("Controllo link",remoteThreat||remoteSuspicious||findings.length?"DA VERIFICARE":"CONTROLLO ESEGUITO",parsed.hostname+" · "+risk);
 }catch(e){out.textContent="Controllo non riuscito: "+e.message+" Riprova più tardi.";}
