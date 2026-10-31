@@ -88,6 +88,13 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 
 <section class="section" id="diagnostics">
 <div class="panel"><div class="panelhead"><h2>IPHONE SECURITY CHECKLIST</h2><span class="tag">GUIDED</span></div><div id="guides"></div></div>
+<div class="panel"><div class="panelhead"><h2>ANALISI FORENSE IOC</h2><span class="tag">LOCAL · CONSENT</span></div>
+<p class="note">Seleziona un rapporto diagnostico o un file di testo esportato da uno strumento forense. SENTINEL analizzerà soltanto il file scelto, direttamente nel browser. Non può leggere processi o memoria privata dell'iPhone.</p>
+<label for="forensicArtifact">Rapporto diagnostico / file esportato</label><input id="forensicArtifact" type="file" accept=".txt,.log,.json,.csv,.xml,.ips,.crash">
+<label for="iocPack">Pacchetto IOC verificato (JSON, facoltativo)</label><input id="iocPack" type="file" accept=".json,application/json">
+<label class="consent"><input type="checkbox" id="forensicConsent"><span>Autorizzo l'analisi locale dei file selezionati. I contenuti non saranno caricati online.</span></label>
+<button class="primary" id="runForensicAnalysis">ANALIZZA RAPPORTO</button><div id="forensicResult" class="note" aria-live="polite">Nessuna analisi eseguita.</div>
+<p class="note">Senza un pacchetto IOC verificato, il motore non può cercare spyware conosciuti. Una corrispondenza richiede verifica forense e non dimostra da sola un'infezione.</p></div>
 <div class="panel"><div class="panelhead"><h2>LIMITI DI ACCESSO</h2><span class="tag">TRANSPARENCY</span></div>
 <div class="result"><div class="resulthead"><strong>Processi interni iOS</strong><span class="state yellow">NON ACCESSIBILI</span></div><p>Una web app non può ispezionare i processi di sistema.</p></div>
 <div class="result"><div class="resulthead"><strong>Memoria privata iPhone</strong><span class="state yellow">NON ACCESSIBILE</span></div><p>Puoi autorizzare l'analisi dei singoli file selezionati.</p></div>
@@ -121,7 +128,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 "use strict";
 const $=id=>document.getElementById(id);
 const LOG_KEY="sentinelSOCLog",PHONE_KEY="sentinelPrivatePhone",PREF_KEY="sentinelNotificationPrefs";
-const APP_VERSION="1.6.2";
+const APP_VERSION="1.6.3";
 const VERSION_URL="./version.json";
 const APP_URL="https://raffaellagranato89-create.github.io/ZeroClick-Security-Lab/";
 let log=[],lastHash="",availableVersion="";
@@ -406,7 +413,28 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
 $("exportPdf").onclick=()=>{
 const w=window.open("","_blank");if(!w){alert("Consenti i popup in Safari.");return;}
 const entries=log.map(x=>"<article><b>"+esc(x.category)+" — "+esc(x.status)+"</b><p>"+esc(new Date(x.date).toLocaleString("it-IT"))+"</p><p>"+esc(x.detail)+"</p></article>").join("");
-w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>SENTINEL Report</title><style>body{font:14px Arial;padding:25px;color:#17243a}article{border-bottom:1px solid #ddd;padding:10px 0}p{overflow-wrap:anywhere}</style></head><body><h1>SENTINEL SECURITY</h1><p>Rapporto diagnostico locale; non certifica l'assenza di malware.</p>"+(entries||"Nessuna attività registrata")+"</body></html>");
+w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>SENTINEL Report</title><style>body{font:14px Arial;padding:25px;color:#17243a}article{border-bottom:1px solid #ddd;padding:10px 0}p{overflow-wrap:anywhere}</style></head><body><h1>SENTINEL SECURITY</h1><p>Rapporto diagnostico locale; non certifica l'assenza di malware.</p>"+(entries||"Nessuna attività registrata")+"<script type="module">
+import { analyzeTextArtifact, DEFAULT_IOC_PACK } from "./anti-spyware/ios-ioc-engine.js";
+const byId=id=>document.getElementById(id);
+byId("runForensicAnalysis")?.addEventListener("click",async()=>{
+ const out=byId("forensicResult"),button=byId("runForensicAnalysis");
+ const artifact=byId("forensicArtifact")?.files?.[0],packFile=byId("iocPack")?.files?.[0];
+ if(!artifact){out.textContent="Seleziona prima un rapporto diagnostico.";return;}
+ if(!byId("forensicConsent")?.checked){out.textContent="Conferma il consenso all'analisi locale.";return;}
+ if(artifact.size>20*1024*1024){out.textContent="File troppo grande: limite 20 MB.";return;}
+ button.disabled=true;out.textContent="Analisi locale in corso…";
+ try{
+   let pack=DEFAULT_IOC_PACK;
+   if(packFile){if(packFile.size>2*1024*1024)throw new Error("Pacchetto IOC troppo grande (massimo 2 MB).");pack=JSON.parse(await packFile.text());}
+   const result=analyzeTextArtifact(await artifact.text(),pack);
+   const lines=["File analizzato: "+artifact.name,"Pacchetto IOC: "+(pack.packId||"personalizzato")+" · Fonte: "+(pack.source||"non specificata"),"Esito: "+(result.status==="indicator_match"?"CORRISPONDENZA IOC":"NESSUNA CORRISPONDENZA NEL PACCHETTO"),"Corrispondenze: "+result.matches.length,...result.matches.map(x=>"- "+x.type+": "+x.value+" · Fonte: "+x.source),...result.limitations.map(x=>"- "+x)];
+   out.replaceChildren();const pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";pre.style.overflowWrap="anywhere";pre.textContent=lines.join("\n");out.append(pre);
+   window.dispatchEvent(new CustomEvent("sentinel-forensic-result",{detail:{status:result.status,matches:result.matches.length,fileName:artifact.name}}));
+ }catch(e){out.textContent="Analisi non riuscita: "+e.message;}
+ finally{button.disabled=false;}
+});
+</script>
+</body></html>");
 w.document.close();w.focus();setTimeout(()=>w.print(),500);
 };
 $("clearLog").onclick=()=>{if(confirm("Vuoi cancellare la cronologia locale?")){log=[];save();render();}};
@@ -503,6 +531,7 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+window.addEventListener("sentinel-forensic-result",event=>{const r=event.detail||{};record("Analisi forense IOC",r.status==="indicator_match"?"DA VERIFICARE":"ANALISI ESEGUITA",(r.matches||0)+" corrispondenze IOC · "+(r.fileName||"file selezionato"));});
 loadPrefs();
 weeklyReminder();
 updateAlerts();
