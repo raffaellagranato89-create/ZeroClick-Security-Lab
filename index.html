@@ -263,7 +263,7 @@ $("checkLink").addEventListener("click",async()=>{
 const field=$("linkToCheck"),out=$("linkResult"),button=$("checkLink");
 let value=field.value.trim();
 if(!value){out.textContent="Inserisci un indirizzo.";return;}
-if(!/^https?:\\/\\//i.test(value))value="https://"+value;
+if(!/^https?:\/\//i.test(value))value="https://"+value;
 let parsed;
 try{parsed=new URL(value);}catch(e){out.textContent="Indirizzo non valido.";return;}
 if(!["http:","https:"].includes(parsed.protocol)||!parsed.hostname.includes(".")){out.textContent="Inserisci un URL HTTP o HTTPS valido.";return;}
