@@ -423,6 +423,12 @@ const target=APP_URL+"?v="+encodeURIComponent(availableVersion)+"&t="+Date.now()
 window.location.replace(target);
 });
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(error => console.warn("SENTINEL offline mode non disponibile:", error));
+  });
+}
+
 loadPrefs();
 weeklyReminder();
 updateAlerts();
