@@ -1,5 +1,5 @@
-const CACHE_NAME = "sentinel-shell-v6";
-const APP_FILES = ["./", "./index.html", "./manifest.webmanifest", "./sentinel-icon.svg", "./dashboard.js", "./manual-log.js", "./risk-analyzer.js", "./security.js", "./simulation.js", "./security-tests.js", "./version.json"];
+const CACHE_NAME = "sentinel-shell-v7";
+const APP_FILES = ["./", "./index.html", "./manifest.webmanifest", "./sentinel-icon.svg", "./dashboard.js", "./manual-log.js", "./risk-analyzer.js", "./security.js", "./simulation.js", "./security-tests.js", "./version.json", "./anti-spyware/ios-ioc-engine.js"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_FILES)).then(() => self.skipWaiting()));
