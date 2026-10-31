@@ -38,7 +38,14 @@ async function googleCheck(url, key) {
 async function destroyListCheck(domain) {
   try {
     const endpoint = "https://api.destroy.tools/v1/check?domain=" + encodeURIComponent(domain);
-    const response = await fetch(endpoint, { headers: { "Accept": "application/json" } });
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "SENTINEL-SECURITY/1.0",
+        "Cache-Control": "no-cache"
+      }
+    });
     if (!response.ok) return { status: "error", message: "PhishDestroy HTTP " + response.status + "." };
     const data = await response.json();
     const score = Number(data.risk_score ?? data.score ?? 0);
