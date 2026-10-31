@@ -42,13 +42,15 @@ async function destroyListCheck(domain) {
     if (!response.ok) return { status: "error", message: "PhishDestroy HTTP " + response.status + "." };
     const data = await response.json();
     const score = Number(data.risk_score ?? data.score ?? 0);
-    const threat = data.threat === true || data.malicious === true || score >= 20;
+    const threat = data.threat === true;
     return {
       status: "checked",
       malicious: threat ? 1 : 0,
       riskScore: Number.isFinite(score) ? score : null,
       severity: data.severity || "unknown",
-      message: threat ? "Il dominio risulta segnalato dal database PhishDestroy." : "Nessuna segnalazione restituita dal database PhishDestroy."
+      suspicious: data.suspicious === true,
+      flags: Array.isArray(data.flags) ? data.flags : [],
+      message: threat ? "Il dominio risulta inserito nella blocklist PhishDestroy." : data.suspicious === true ? "Il dominio non risulta bloccato, ma presenta segnali euristici sospetti." : "Il dominio non risulta nella blocklist interrogata; questo non garantisce che sia sicuro."
     };
   } catch {
     return { status: "error", message: "Errore di collegamento a PhishDestroy." };
