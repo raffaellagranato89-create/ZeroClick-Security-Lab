@@ -414,7 +414,6 @@ $("exportPdf").onclick=()=>{
 const w=window.open("","_blank");if(!w){alert("Consenti i popup in Safari.");return;}
 const entries=log.map(x=>"<article><b>"+esc(x.category)+" — "+esc(x.status)+"</b><p>"+esc(new Date(x.date).toLocaleString("it-IT"))+"</p><p>"+esc(x.detail)+"</p></article>").join("");
 w.document.write("<!doctype html><html><head><meta charset='utf-8'><title>SENTINEL Report</title><style>body{font:14px Arial;padding:25px;color:#17243a}article{border-bottom:1px solid #ddd;padding:10px 0}p{overflow-wrap:anywhere}</style></head><body><h1>SENTINEL SECURITY</h1><p>Rapporto diagnostico locale; non certifica l'assenza di malware.</p>"+(entries||"Nessuna attività registrata")+"</body></html>");
-</body></html>");
 w.document.close();w.focus();setTimeout(()=>w.print(),500);
 };
 $("clearLog").onclick=()=>{if(confirm("Vuoi cancellare la cronologia locale?")){log=[];save();render();}};
