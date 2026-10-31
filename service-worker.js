@@ -1,4 +1,4 @@
-const CACHE_NAME = "sentinel-shell-v7";
+const CACHE_NAME = "sentinel-shell-v8";
 const APP_FILES = ["./", "./index.html", "./manifest.webmanifest", "./sentinel-icon.svg", "./dashboard.js", "./manual-log.js", "./risk-analyzer.js", "./security.js", "./simulation.js", "./security-tests.js", "./version.json", "./anti-spyware/ios-ioc-engine.js"];
 
 self.addEventListener("install", event => {
