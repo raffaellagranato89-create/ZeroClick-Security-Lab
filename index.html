@@ -102,7 +102,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 <div class="result"><div class="resulthead"><strong>WhatsApp privato</strong><span class="state yellow">NON ACCESSIBILE</span></div><p>Le sessioni si verificano direttamente nell'app WhatsApp.</p></div></div>
 </section>
 
-<section class="section" id="reports"><div class="panel"><div class="panelhead"><h2>SECURITY EVENT LOG</h2><span class="tag">LOCAL HISTORY</span></div><div id="reportList"></div><hr><button class="secondary" id="exportCsv">ESPORTA CSV</button><button class="secondary" id="exportPdf">STAMPA / SALVA PDF</button><button class="secondary" id="clearLog">CANCELLA CRONOLOGIA</button></div></section>
+<section class="section" id="reports"><div class="panel"><div class="panelhead"><h2>SECURITY EVENT LOG</h2><span class="tag">LOCAL HISTORY</span></div><div id="reportList"></div><hr><button class="secondary" id="exportCsv">ESPORTA CSV</button><button class="secondary" id="exportPdf">STAMPA / SALVA PDF</button><hr><h2>BACKUP E RIPRISTINO</h2><p class="note">Esporta una copia JSON della cronologia SENTINEL oppure importa un backup precedente. Il file resta sul tuo dispositivo: conservalo in un luogo sicuro.</p><button class="secondary" id="exportBackup">ESPORTA BACKUP JSON</button><input id="importBackupFile" type="file" accept=".json,application/json"><button class="secondary" id="importBackup">RIPRISTINA BACKUP</button><div id="backupStatus" class="note" aria-live="polite">Nessuna operazione eseguita.</div><button class="secondary" id="clearLog">CANCELLA CRONOLOGIA</button></div></section>
 
 <section class="section" id="notifications">
 <div class="panel"><div class="panelhead"><h2>NOTIFICHE E AGGIORNAMENTI</h2><span class="tag">PREFERENZE</span></div>
@@ -128,7 +128,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 "use strict";
 const $=id=>document.getElementById(id);
 const LOG_KEY="sentinelSOCLog",PHONE_KEY="sentinelPrivatePhone",PREF_KEY="sentinelNotificationPrefs";
-const APP_VERSION="1.6.4";
+const APP_VERSION="1.6.5";
 const VERSION_URL="./version.json";
 const APP_URL="https://raffaellagranato89-create.github.io/ZeroClick-Security-Lab/";
 let log=[],lastHash="",availableVersion="";
@@ -409,6 +409,31 @@ const rows=[["Data","Categoria","Stato","Dettaglio","URL","Indice","Rischio"],..
 const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
 download(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}),"sentinel-report.csv");
 };
+
+function backupPayload(){
+ return {format:"sentinel-backup",schemaVersion:1,appVersion:APP_VERSION,createdAt:new Date().toISOString(),entries:log.slice(-500)};
+}
+$("exportBackup").addEventListener("click",()=>{
+ const payload=backupPayload();
+ download(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),"sentinel-backup-"+new Date().toISOString().slice(0,10)+".json");
+ $("backupStatus").textContent="Backup esportato. Conserva il file in un luogo sicuro.";
+});
+$("importBackup").addEventListener("click",async()=>{
+ const file=$("importBackupFile").files[0],out=$("backupStatus");
+ if(!file){out.textContent="Seleziona prima un file JSON.";return;}
+ if(file.size>5*1024*1024){out.textContent="File troppo grande: limite 5 MB.";return;}
+ try{
+  const data=JSON.parse(await file.text());
+  if(!data||data.format!=="sentinel-backup"||data.schemaVersion!==1||!Array.isArray(data.entries))throw new Error("Formato backup non riconosciuto.");
+  if(data.entries.length>500)throw new Error("Il backup contiene più di 500 registrazioni.");
+  const valid=data.entries.every(x=>x&&typeof x==="object"&&typeof x.date==="string"&&!Number.isNaN(Date.parse(x.date))&&typeof x.category==="string"&&typeof x.status==="string"&&typeof x.detail==="string");
+  if(!valid)throw new Error("Il backup contiene registrazioni non valide.");
+  if(!confirm("Il ripristino sostituirà la cronologia attuale con "+data.entries.length+" registrazioni del backup. Continuare?"))return;
+  log=data.entries.map(x=>({date:x.date,category:x.category.slice(0,100),status:x.status.slice(0,100),detail:x.detail.slice(0,2000),...(typeof x.url==="string"?{url:x.url.slice(0,2048)}:{}),...(Number.isFinite(x.score)?{score:x.score}:{}),...(typeof x.risk==="string"?{risk:x.risk.slice(0,40)}:{})}));
+  save();render();out.textContent="Ripristino completato: "+log.length+" registrazioni importate.";
+ }catch(e){out.textContent="Backup non importato: "+e.message;}
+});
+
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 $("exportPdf").onclick=()=>{
 const w=window.open("","_blank");if(!w){alert("Consenti i popup in Safari.");return;}
