@@ -537,11 +537,34 @@ struct LinkScannerView: View {
                         Text(errorMessage).foregroundStyle(.orange).font(.footnote)
                     }
                     if let result {
+                        let threatDetected = (result.phishDestroy.malicious ?? 0) > 0 ||
+                            (result.googleSafeBrowsing.malicious ?? 0) > 0
+                        let suspiciousSignal = result.phishDestroy.suspicious == true
+                        let unavailable = result.phishDestroy.status != "checked" &&
+                            result.googleSafeBrowsing.status != "checked"
                         Text(result.verdict)
                             .font(.headline)
-                            .foregroundStyle(result.verdict.lowercased().contains("malicious") || result.verdict.lowercased().contains("unsafe") ? .red : .cyan)
+                            .foregroundStyle(threatDetected ? .red : (suspiciousSignal || unavailable ? .orange : .cyan))
+                        if threatDetected {
+                            Label("Attenzione: almeno un servizio ha segnalato una possibile minaccia.", systemImage: "exclamationmark.triangle.fill")
+                                .font(.footnote.bold())
+                                .foregroundStyle(.red)
+                        } else if suspiciousSignal {
+                            Label("Il dominio presenta segnali sospetti: procedi con cautela.", systemImage: "exclamationmark.triangle")
+                                .font(.footnote.bold())
+                                .foregroundStyle(.orange)
+                        } else if unavailable {
+                            Label("Nessun servizio è riuscito a completare il controllo.", systemImage: "wifi.exclamationmark")
+                                .font(.footnote.bold())
+                                .foregroundStyle(.orange)
+                        }
                         sourceView("Google Safe Browsing", result.googleSafeBrowsing)
                         sourceView("PhishDestroy", result.phishDestroy)
+                        if let checkedAt = result.checkedAt {
+                            Text("Controllo eseguito: \\(checkedAt)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     Text("Privacy e limiti: il link completo viene trasmesso ai fornitori esterni quando premi Verifica. Evita link contenenti token privati o informazioni personali. I risultati possono essere incompleti o avere falsi positivi; nessun esito garantisce sicurezza.")
