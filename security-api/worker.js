@@ -37,7 +37,7 @@ async function clientRateLimited(request) {
   const bucket = Math.floor(Date.now() / (RATE_WINDOW_SECONDS * 1000));
   const path = "rate/" + key + "/" + bucket;
   const previous = await readCache(path);
-  const count = previous ? Number(await previous.text()) || 0 : 0;
+  const count = previous ? Number(await previous.json()) || 0 : 0;
   if (count >= RATE_MAX_REQUESTS) return true;
   await writeCache(path, String(count + 1), RATE_WINDOW_SECONDS + 5);
   return false;
