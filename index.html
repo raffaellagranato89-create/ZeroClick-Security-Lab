@@ -95,6 +95,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 <label class="consent"><input type="checkbox" id="forensicConsent"><span>Autorizzo l'analisi locale dei file selezionati. I contenuti non saranno caricati online.</span></label>
 <button class="primary" id="runForensicAnalysis">ANALIZZA RAPPORTO</button><div id="forensicResult" class="note" aria-live="polite">Nessuna analisi eseguita.</div>
 <p class="note">Senza un pacchetto IOC verificato, il motore non può cercare spyware conosciuti. Una corrispondenza richiede verifica forense e non dimostra da sola un'infezione.</p></div>
+<div class="panel"><div class="panelhead"><h2>TEST AUTOMATICI DEL MOTORE IOC</h2><span class="tag">LOCALE</span></div><p class="note">Esegue nel browser i test sintetici di regressione del motore IOC. Non analizza iOS, non esamina il dispositivo e non rileva spyware.</p><button class="primary" id="runSecurityTests">ESEGUI TEST DI SICUREZZA</button><div id="securityTestResults" class="note" aria-live="polite">Test non ancora eseguiti.</div></div>
 <div class="panel"><div class="panelhead"><h2>LIMITI DI ACCESSO</h2><span class="tag">TRANSPARENCY</span></div>
 <div class="result"><div class="resulthead"><strong>Processi interni iOS</strong><span class="state yellow">NON ACCESSIBILI</span></div><p>Una web app non può ispezionare i processi di sistema.</p></div>
 <div class="result"><div class="resulthead"><strong>Memoria privata iPhone</strong><span class="state yellow">NON ACCESSIBILE</span></div><p>Puoi autorizzare l'analisi dei singoli file selezionati.</p></div>
@@ -128,7 +129,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 "use strict";
 const $=id=>document.getElementById(id);
 const LOG_KEY="sentinelSOCLog",PHONE_KEY="sentinelPrivatePhone",PREF_KEY="sentinelNotificationPrefs";
-const APP_VERSION="1.6.6";
+const APP_VERSION="1.6.7";
 $("appVersion").textContent="VERSIONE "+APP_VERSION;
 const VERSION_URL="./version.json";
 const APP_URL="https://raffaellagranato89-create.github.io/ZeroClick-Security-Lab/";
@@ -451,7 +452,27 @@ if(prefs.app)checkUpdates();
 
 <script type="module">
 import { analyzeTextArtifact, DEFAULT_IOC_PACK } from "./anti-spyware/ios-ioc-engine.js";
+import { runSecurityTests } from "./security-tests.js";
 const byId=id=>document.getElementById(id);
+byId("runSecurityTests")?.addEventListener("click",()=>{
+ const out=byId("securityTestResults"),button=byId("runSecurityTests");
+ button.disabled=true;out.replaceChildren();
+ try{
+  const results=runSecurityTests(),passed=results.filter(x=>x.passed).length;
+  const summary=document.createElement("p");
+  summary.textContent=passed+" / "+results.length+" test superati · "+new Date().toLocaleString("it-IT");
+  summary.style.fontWeight="bold";out.append(summary);
+  results.forEach(result=>{
+   const line=document.createElement("p");
+   line.textContent=(result.passed?"✓ SUPERATO — ":"✕ FALLITO — ")+result.name+(result.error?" · "+result.error:"");
+   line.style.color=result.passed?"#4cdda0":"#ff687c";out.append(line);
+  });
+  const note=document.createElement("p");note.className="note";
+  note.textContent="Test sintetici del motore IOC. Non scansionano iPhone e non rilevano spyware. Un test superato verifica soltanto il comportamento software previsto.";
+  out.append(note);
+ }catch(error){out.textContent="Esecuzione non riuscita: "+String(error?.message||error);}
+ finally{button.disabled=false;}
+});
 byId("runForensicAnalysis")?.addEventListener("click",async()=>{
  const out=byId("forensicResult"),button=byId("runForensicAnalysis");
  const artifact=byId("forensicArtifact")?.files?.[0],packFile=byId("iocPack")?.files?.[0];
