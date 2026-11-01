@@ -7,6 +7,46 @@ const cors = {
   "Cache-Control": "no-store"
 };
 
+
+const HASH_CACHE_TTL = 60 * 60;
+const NO_MATCH_CACHE_TTL = 15 * 60;
+const RATE_WINDOW_SECONDS = 60;
+const RATE_MAX_REQUESTS = 8;
+const UPSTREAM_COOLDOWN_SECONDS = 15 * 60;
+
+class UpstreamRateLimitError extends Error {
+  constructor(retryAfter) { super("abuse.ch rate limit"); this.retryAfter = retryAfter; }
+}
+async function cacheKey(path) {
+  return new Request("https://sentinel-internal-cache.invalid/" + path);
+}
+async function readCache(path) {
+  try { return await caches.default.match(await cacheKey(path)); } catch { return null; }
+}
+async function writeCache(path, value, ttl) {
+  try {
+    await caches.default.put(await cacheKey(path), new Response(JSON.stringify(value), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=" + ttl }
+    }));
+  } catch { /* Cache API non disponibile: la verifica continua senza cache. */ }
+}
+async function clientRateLimited(request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
+  const key = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+  const bucket = Math.floor(Date.now() / (RATE_WINDOW_SECONDS * 1000));
+  const path = "rate/" + key + "/" + bucket;
+  const previous = await readCache(path);
+  const count = previous ? Number(await previous.text()) || 0 : 0;
+  if (count >= RATE_MAX_REQUESTS) return true;
+  await writeCache(path, String(count + 1), RATE_WINDOW_SECONDS + 5);
+  return false;
+}
+function retrySeconds(response) {
+  const value = Number(response.headers.get("Retry-After"));
+  return Number.isFinite(value) && value > 0 ? Math.min(value, 3600) : UPSTREAM_COOLDOWN_SECONDS;
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: cors });
 }
@@ -71,6 +111,7 @@ async function lookupMalwareBazaar(hash, key) {
     body,
     signal: AbortSignal.timeout(12000)
   });
+  if (response.status === 429) throw new UpstreamRateLimitError(retrySeconds(response));
   if (!response.ok) return { source: "MalwareBazaar", status: "error", message: "Servizio non disponibile (HTTP " + response.status + ")." };
   const data = await response.json();
   if (data.query_status === "ok" && Array.isArray(data.data) && data.data.length) {
@@ -95,6 +136,7 @@ async function lookupThreatFox(hash, key) {
     body: JSON.stringify({ query: "search_hash", hash }),
     signal: AbortSignal.timeout(12000)
   });
+  if (response.status === 429) throw new UpstreamRateLimitError(retrySeconds(response));
   if (!response.ok) return { source: "ThreatFox", status: "error", message: "Servizio non disponibile (HTTP " + response.status + ")." };
   const data = await response.json();
   if (data.query_status === "ok" && Array.isArray(data.data) && data.data.length) {
@@ -113,31 +155,66 @@ async function lookupThreatFox(hash, key) {
   return { source: "ThreatFox", status: "error", message: "Risposta API non interpretabile: " + String(data.query_status || "unknown").slice(0, 80) };
 }
 
-async function lookupHash(hash, env) {
+async function lookupHash(hash, env, request) {
   if (!/^[a-f0-9]{64}$/i.test(hash)) return json({ error: "È richiesto un hash SHA-256 valido." }, 400);
   if (!env.ABUSECH_AUTH_KEY) return json({
-    verdict: "NON CONFIGURATO",
-    status: "not_configured",
+    verdict: "NON CONFIGURATO", status: "not_configured",
     message: "La chiave personale abuse.ch non è ancora configurata sul server.",
     checkedAt: new Date().toISOString()
   }, 503);
+
+  const normalizedHash = hash.toLowerCase();
+  const cached = await readCache("hash/" + normalizedHash);
+  if (cached) {
+    try {
+      const data = await cached.json();
+      data.cached = true;
+      return json(data);
+    } catch { /* cache corrotta: ripetere una verifica nuova */ }
+  }
+
+  const cooldown = await readCache("abusech/cooldown");
+  if (cooldown) {
+    const info = await cooldown.json().catch(() => ({}));
+    return json({
+      verdict: "VERIFICA TEMPORANEAMENTE SOSPESA", status: "rate_limited",
+      retryAfter: info.retryAfter || UPSTREAM_COOLDOWN_SECONDS,
+      message: "Le fonti abuse.ch hanno imposto un limite temporaneo. SENTINEL ha sospeso nuove interrogazioni per rispettare il limite."
+    }, 429);
+  }
+
+  if (await clientRateLimited(request)) {
+    return json({ status: "rate_limited", message: "Limite SENTINEL raggiunto: massimo 8 richieste al minuto per indirizzo IP. Attendi prima di riprovare." }, 429);
+  }
+
   const results = await Promise.allSettled([
-    lookupMalwareBazaar(hash.toLowerCase(), env.ABUSECH_AUTH_KEY),
-    lookupThreatFox(hash.toLowerCase(), env.ABUSECH_AUTH_KEY)
+    lookupMalwareBazaar(normalizedHash, env.ABUSECH_AUTH_KEY),
+    lookupThreatFox(normalizedHash, env.ABUSECH_AUTH_KEY)
   ]);
+  const rateLimit = results.find(x => x.status === "rejected" && x.reason instanceof UpstreamRateLimitError);
+  if (rateLimit) {
+    const retryAfter = rateLimit.reason.retryAfter;
+    await writeCache("abusech/cooldown", { retryAfter, since: new Date().toISOString() }, retryAfter);
+    return json({
+      verdict: "VERIFICA TEMPORANEAMENTE SOSPESA", status: "rate_limited", retryAfter,
+      message: "Una fonte abuse.ch ha risposto con HTTP 429. SENTINEL ha sospeso le interrogazioni per rispettare il limite."
+    }, 429);
+  }
+
   const sources = results.map((result, index) => result.status === "fulfilled"
     ? result.value
     : { source: index === 0 ? "MalwareBazaar" : "ThreatFox", status: "error", message: "Errore di collegamento al servizio." });
   const detected = sources.some(source => source.status === "match");
   const checked = sources.some(source => source.status === "match" || source.status === "no_match");
-  return json({
+  const responseData = {
     verdict: detected ? "HASH ASSOCIATO A MINACCE NOTE" : checked ? "NESSUNA CORRISPONDENZA NELLE FONTI INTERROGATE" : "VERIFICA NON DISPONIBILE",
     status: detected ? "match" : checked ? "no_match" : "error",
-    hash: hash.toLowerCase(),
-    sources,
+    hash: normalizedHash, sources, cached: false,
     checkedAt: new Date().toISOString(),
     caution: "Una corrispondenza è un indicatore da approfondire, non una diagnosi definitiva. Nessuna corrispondenza non dimostra che il file sia sicuro."
-  });
+  };
+  if (checked) await writeCache("hash/" + normalizedHash, responseData, detected ? HASH_CACHE_TTL : NO_MATCH_CACHE_TTL);
+  return json(responseData);
 }
 
 export default {
@@ -153,7 +230,7 @@ export default {
 
     if (input && input.action === "lookup_hash") {
       if (typeof input.hash !== "string") return json({ error: "Hash mancante." }, 400);
-      return lookupHash(input.hash.trim(), env);
+      return lookupHash(input.hash.trim(), env, request);
     }
 
     if (!input || typeof input.url !== "string" || input.url.length > 2048) {
