@@ -24,7 +24,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 </style>
 </head>
 <body><div class="app">
-<header><div class="brand"><div class="logo">⬡</div><div><strong>SENTINEL</strong><small>SECURITY OPERATIONS CENTER</small></div></div><div class="live">LOCAL MODE<br><span id="appVersion">VERSIONE 1.6.6</span></div></header>
+<header><div class="brand"><div class="logo">⬡</div><div><strong>SENTINEL</strong><small>SECURITY OPERATIONS CENTER</small></div></div><div class="live">LOCAL MODE<br><span id="appVersion">VERSIONE 1.6.8</span></div></header>
 <div class="hero"><div class="eyebrow">PERSONAL CYBERSECURITY PLATFORM</div><h1>Security overview</h1><p class="muted">Diagnostica locale, analisi dei file e ricerche pubbliche con consenso esplicito.</p></div>
 <div id="globalAlert" class="alert"></div>
 <nav class="nav">
@@ -84,7 +84,7 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 <div class="panel"><div class="panelhead"><h2>GOOGLE THREAT INTELLIGENCE</h2><span class="tag">CONSENT REQUIRED</span></div><label for="domain">Dominio o sito da controllare</label><input id="domain" type="text" placeholder="esempio.com"><label class="consent"><input type="checkbox" id="domainConsent"><span>Acconsento a inviare a Google il dominio inserito come termine di ricerca.</span></label><button class="secondary" id="searchDomain">CERCA DOMINIO SU GOOGLE</button><p class="note">La ricerca pubblica non è un servizio antivirus certificato.</p></div>
 </section>
 
-<section class="section" id="scanner"><div class="panel"><div class="panelhead"><h2>FILE FORENSIC ANALYSIS</h2><span class="tag">LOCAL ONLY</span></div><p class="note">Seleziona i file che autorizzi ad analizzare. I file vengono elaborati nel browser e non caricati online.</p><input id="fileInput" type="file" multiple><button class="primary" id="analyzeFiles">ANALIZZA FILE SELEZIONATI</button><div id="fileResults"></div><p class="note">SHA-256 identifica un file ma non certifica che sia sicuro. Gli archivi ZIP vengono riconosciuti ma non estratti. Gli indicatori possono produrre falsi positivi.</p><div class="panelhead"><h2>RICERCA HASH SU GOOGLE</h2></div><label class="consent"><input type="checkbox" id="hashConsent"><span>Acconsento a inviare a Google l'hash SHA-256 del file. Il file originale non viene inviato.</span></label><button class="secondary" id="searchHash" disabled>RICERCA HASH SU GOOGLE</button></div><div class="panel"><div class="panelhead"><h2>CONTROLLO LINK ONLINE</h2><span class="tag">THREAT LOOKUP</span></div><label for="linkToCheck">Indirizzo da verificare</label><input id="linkToCheck" type="text" inputmode="url" placeholder="https://esempio.com"><label class="consent"><input type="checkbox" id="linkConsent"><span>Acconsento a inviare l'indirizzo inserito al servizio SENTINEL per il controllo. Non inserire link privati o contenenti token personali.</span></label><button class="primary" id="checkLink">CONTROLLA LINK</button><div id="linkResult" class="note" aria-live="polite">Il controllo invia l'URL al servizio esterno SENTINEL. Non apre il sito.</div><p class="note">Il risultato si basa su fonti di reputazione disponibili e controlli euristici. Un esito senza segnalazioni non garantisce che il sito sia sicuro.</p></div></section>
+<section class="section" id="scanner"><div class="panel"><div class="panelhead"><h2>FILE FORENSIC ANALYSIS</h2><span class="tag">LOCAL ONLY</span></div><p class="note">Seleziona i file che autorizzi ad analizzare. I file vengono elaborati nel browser e non caricati online.</p><input id="fileInput" type="file" multiple><button class="primary" id="analyzeFiles">ANALIZZA FILE SELEZIONATI</button><div id="fileResults"></div><p class="note">SHA-256 identifica un file ma non certifica che sia sicuro. Gli archivi ZIP vengono riconosciuti ma non estratti. Gli indicatori possono produrre falsi positivi.</p><div class="panelhead"><h2>RICONOSCIMENTO MINACCE NOTE</h2><span class="tag">ABUSE.CH</span></div><p class="note">Confronta l'hash SHA-256 con MalwareBazaar e ThreatFox. Il file resta sul dispositivo: viene trasmesso soltanto l'hash, dopo consenso. Richiede la chiave API configurata dal gestore del server.</p><label class="consent"><input type="checkbox" id="malwareConsent"><span>Acconsento a inviare al servizio SENTINEL esclusivamente l'hash SHA-256 del file selezionato per la verifica nelle fonti abuse.ch.</span></label><button class="primary" id="lookupMalware" disabled>VERIFICA HASH CON DATABASE MALWARE</button><div id="malwareResult" class="note" aria-live="polite">Analisi online non ancora eseguita.</div><div class="panelhead"><h2>RICERCA HASH SU GOOGLE</h2></div><label class="consent"><input type="checkbox" id="hashConsent"><span>Acconsento a inviare a Google l'hash SHA-256 del file. Il file originale non viene inviato.</span></label><button class="secondary" id="searchHash" disabled>RICERCA HASH SU GOOGLE</button></div><div class="panel"><div class="panelhead"><h2>CONTROLLO LINK ONLINE</h2><span class="tag">THREAT LOOKUP</span></div><label for="linkToCheck">Indirizzo da verificare</label><input id="linkToCheck" type="text" inputmode="url" placeholder="https://esempio.com"><label class="consent"><input type="checkbox" id="linkConsent"><span>Acconsento a inviare l'indirizzo inserito al servizio SENTINEL per il controllo. Non inserire link privati o contenenti token personali.</span></label><button class="primary" id="checkLink">CONTROLLA LINK</button><div id="linkResult" class="note" aria-live="polite">Il controllo invia l'URL al servizio esterno SENTINEL. Non apre il sito.</div><p class="note">Il risultato si basa su fonti di reputazione disponibili e controlli euristici. Un esito senza segnalazioni non garantisce che il sito sia sicuro.</p></div></section>
 
 <section class="section" id="diagnostics">
 <div class="panel"><div class="panelhead"><h2>IPHONE SECURITY CHECKLIST</h2><span class="tag">GUIDED</span></div><div id="guides"></div></div>
@@ -129,10 +129,11 @@ footer{text-align:center;color:#7187a5;font-size:10px;padding:20px;line-height:1
 "use strict";
 const $=id=>document.getElementById(id);
 const LOG_KEY="sentinelSOCLog",PHONE_KEY="sentinelPrivatePhone",PREF_KEY="sentinelNotificationPrefs";
-const APP_VERSION="1.6.7";
+const APP_VERSION="1.6.8";
 $("appVersion").textContent="VERSIONE "+APP_VERSION;
 const VERSION_URL="./version.json";
 const APP_URL="https://raffaellagranato89-create.github.io/ZeroClick-Security-Lab/";
+const SECURITY_API="https://zeroclick-security-lab.raffellagranato89.workers.dev";
 let log=[],lastHash="",availableVersion="";
 try{const old=JSON.parse(localStorage.getItem(LOG_KEY)||"[]");if(Array.isArray(old))log=old;}catch(e){}
 
@@ -281,7 +282,36 @@ const note=document.createElement("p");note.className="note";note.textContent="E
 record("File",flags.length?"DA VERIFICARE":"ANALISI ESEGUITA",f.name+" · "+kind+" · "+(flags.join("; ")||"Nessun indicatore euristico")+" · SHA-256: "+hash);
 if(hash!=="Non calcolato"&&!hash.includes("Oltre"))lastHash=hash;
 }
-if(lastHash)$("searchHash").disabled=false;
+if(lastHash){$("searchHash").disabled=false;$("lookupMalware").disabled=false;}
+});
+
+$("lookupMalware").addEventListener("click",async()=>{
+if(!lastHash){alert("Prima analizza un file per calcolare il suo hash SHA-256.");return;}
+if(!$("malwareConsent").checked){alert("Conferma il consenso prima della verifica online.");return;}
+if(!confirm("Verrà inviato soltanto l'hash SHA-256, non il file. Continuare?"))return;
+const out=$("malwareResult"),button=$("lookupMalware");
+$("malwareConsent").checked=false;button.disabled=true;out.textContent="Interrogazione di MalwareBazaar e ThreatFox in corso…";
+try{
+ const response=await fetch(SECURITY_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"lookup_hash",hash:lastHash})});
+ const data=await response.json();
+ if(!response.ok&&data.status!=="not_configured")throw new Error(data.error||data.message||"Servizio non disponibile.");
+ const lines=["Esito: "+(data.verdict||data.message||"Non disponibile"),"SHA-256: "+lastHash];
+ (data.sources||[]).forEach(source=>{
+  lines.push("",source.source+": "+source.status);
+  if(source.family)lines.push("Famiglia: "+source.family);
+  if(source.fileName)lines.push("Nome rilevato: "+source.fileName);
+  if(source.fileType)lines.push("Tipo: "+source.fileType);
+  if(source.firstSeen)lines.push("Prima osservazione: "+source.firstSeen);
+  (source.indicators||[]).forEach(item=>lines.push("Minaccia: "+(item.malware||"non specificata")+" · "+(item.threatType||"tipo non specificato")+" · "+(item.firstSeen||"data non disponibile")));
+  if(source.message)lines.push(source.message);
+ });
+ if(data.caution)lines.push("",data.caution);
+ if(data.message)lines.push(data.message);
+ out.replaceChildren();const pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";pre.style.overflowWrap="anywhere";pre.textContent=lines.join("\n");out.append(pre);
+ const match=data.status==="match";
+ record("Verifica hash malware",match?"DA VERIFICARE":data.status==="no_match"?"NESSUNA CORRISPONDENZA":"VERIFICA NON DISPONIBILE",lines.join(" · "));
+}catch(error){out.textContent="Verifica non riuscita: "+error.message;record("Verifica hash malware","VERIFICA NON DISPONIBILE",error.message);}
+finally{button.disabled=false;}
 });
 $("searchHash").addEventListener("click",()=>{
 if(!lastHash)return;
